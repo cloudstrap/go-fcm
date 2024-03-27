@@ -2,10 +2,12 @@ package fcm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"golang.org/x/oauth2/google"
 	"time"
 )
 
@@ -39,6 +41,12 @@ var (
 type FcmClient struct {
 	ApiKey  string
 	Message FcmMsg
+	UseV1API        bool
+  CredentialsJSON string
+}
+
+type FcmMessageWrapper struct {
+	Message FcmMsg `json:"message"`
 }
 
 // FcmMsg represents fcm request message
@@ -67,7 +75,9 @@ type FcmResponseStatus struct {
 	Canonical_ids int                 `json:"canonical_ids"`
 	Results       []map[string]string `json:"results,omitempty"`
 	MsgId         int64               `json:"message_id,omitempty"`
-	Err           string              `json:"error,omitempty"`
+	// Err           string              `json:"error,omitempty"`
+	Err interface{}                   `json:"error,omitempty"`
+	// Err json.RawMessage `json:"error,omitempty"`
 	RetryAfter    string
 }
 
@@ -196,11 +206,122 @@ func (this *FcmClient) sendOnce() (*FcmResponseStatus, error) {
 	return fcmRespStatus, nil
 }
 
-// Send to fcm
-func (this *FcmClient) Send() (*FcmResponseStatus, error) {
-	return this.sendOnce()
-
+func (f *FcmClient) getToken() (string, error) {
+	config, err := google.JWTConfigFromJSON([]byte(f.CredentialsJSON), "https://www.googleapis.com/auth/firebase.messaging")
+	if err != nil {
+			return "", err
+	}
+	tokenSource := config.TokenSource(context.Background())
+	token, err := tokenSource.Token()
+	if err != nil {
+			return "", err
+	}
+	return token.AccessToken, nil
 }
+
+// New Send to fcm
+func (f *FcmClient) Send() (*FcmResponseStatus, error) {
+	if f.UseV1API {
+			return f.sendViaV1()
+	} else {
+			return f.sendOnce()
+	}
+}
+
+func (f *FcmClient) getProjectID() (string, error) {
+	var creds struct {
+			ProjectID string `json:"project_id"`
+	}
+	if err := json.Unmarshal([]byte(f.CredentialsJSON), &creds); err != nil {
+			return "", err
+	}
+	return creds.ProjectID, nil
+}
+
+func (f *FcmClient) sendViaV1() (*FcmResponseStatus, error) {
+	token, err := f.getToken()
+	if err != nil {
+			return nil, err
+	}
+
+	// Structuring the payload for FCM v1 API with platform-specific adjustments
+	payload := struct {
+			Message struct {
+					Token        string `json:"token"`
+					Notification struct {
+							Title string `json:"title"`
+							Body  string `json:"body"`
+					} `json:"notification"`
+					Android struct {
+							Notification struct {
+									Title string `json:"title"`
+									Body  string `json:"body"`
+									Sound string `json:"sound"` // Android-specific sound placement
+							} `json:"notification"`
+					} `json:"android,omitempty"`
+					Data interface{} `json:"data,omitempty"`
+			} `json:"message"`
+	}{}
+
+	// Assign recipient's token, and transform NotificationPayload to platform-specific structures
+	payload.Message.Token = f.Message.To // Assuming 'To' field is used for the recipient's token
+	payload.Message.Notification.Title = f.Message.Notification.Title
+	payload.Message.Notification.Body = f.Message.Notification.Body
+
+	// For Android
+	payload.Message.Android.Notification.Title = f.Message.Notification.Title
+	payload.Message.Android.Notification.Body = f.Message.Notification.Body
+	payload.Message.Android.Notification.Sound = f.Message.Notification.Sound
+
+	// Assign any additional data
+	payload.Message.Data = f.Message.Data
+
+	jsonByte, err := json.Marshal(payload)
+	if err != nil {
+			return nil, err
+	}
+
+	projectID, err := f.getProjectID()
+	if err != nil {
+			return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("https://fcm.googleapis.com/v1/projects/%s/messages:send", projectID), bytes.NewBuffer(jsonByte))
+	if err != nil {
+			return nil, err
+	}
+
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+			return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+			return nil, err
+	}
+
+	fcmRespStatus := new(FcmResponseStatus)
+	if err := json.Unmarshal(body, fcmRespStatus); err != nil {
+			return nil, err
+	}
+
+	return fcmRespStatus, nil
+}
+
+
+
+
+// Old Send to fcm
+// func (this *FcmClient) Send() (*FcmResponseStatus, error) {
+// 	return this.sendOnce()
+
+// }
 
 // toJsonByte converts FcmMsg to a json byte
 func (this *FcmMsg) toJsonByte() ([]byte, error) {
