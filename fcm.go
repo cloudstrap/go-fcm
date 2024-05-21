@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"golang.org/x/oauth2/google"
 	"time"
+
+	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -39,10 +40,10 @@ var (
 
 // FcmClient stores the key and the Message (FcmMsg)
 type FcmClient struct {
-	ApiKey  string
-	Message FcmMsg
+	ApiKey          string
+	Message         FcmMsg
 	UseV1API        bool
-  CredentialsJSON string
+	CredentialsJSON string
 }
 
 type FcmMessageWrapper struct {
@@ -76,9 +77,9 @@ type FcmResponseStatus struct {
 	Results       []map[string]string `json:"results,omitempty"`
 	MsgId         int64               `json:"message_id,omitempty"`
 	// Err           string              `json:"error,omitempty"`
-	Err interface{}                   `json:"error,omitempty"`
+	Err interface{} `json:"error,omitempty"`
 	// Err json.RawMessage `json:"error,omitempty"`
-	RetryAfter    string
+	RetryAfter string
 }
 
 // NotificationPayload notification message payload
@@ -209,12 +210,13 @@ func (this *FcmClient) sendOnce() (*FcmResponseStatus, error) {
 func (f *FcmClient) getToken() (string, error) {
 	config, err := google.JWTConfigFromJSON([]byte(f.CredentialsJSON), "https://www.googleapis.com/auth/firebase.messaging")
 	if err != nil {
-			return "", err
+		return "", err
 	}
 	tokenSource := config.TokenSource(context.Background())
 	token, err := tokenSource.Token()
+	fmt.Println(token.AccessToken)
 	if err != nil {
-			return "", err
+		return "", err
 	}
 	return token.AccessToken, nil
 }
@@ -222,73 +224,120 @@ func (f *FcmClient) getToken() (string, error) {
 // New Send to fcm
 func (f *FcmClient) Send() (*FcmResponseStatus, error) {
 	if f.UseV1API {
-			return f.sendViaV1()
+		return f.sendViaV1()
 	} else {
-			return f.sendOnce()
+		return f.sendOnce()
 	}
 }
 
 func (f *FcmClient) getProjectID() (string, error) {
 	var creds struct {
-			ProjectID string `json:"project_id"`
+		ProjectID string `json:"project_id"`
 	}
 	if err := json.Unmarshal([]byte(f.CredentialsJSON), &creds); err != nil {
-			return "", err
+		return "", err
 	}
 	return creds.ProjectID, nil
 }
 
+// sendViaV1 sends a message via FCM v1 API
 func (f *FcmClient) sendViaV1() (*FcmResponseStatus, error) {
 	token, err := f.getToken()
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	// Structuring the payload for FCM v1 API with platform-specific adjustments
 	payload := struct {
-			Message struct {
-					Token        string `json:"token"`
-					Notification struct {
-							Title string `json:"title"`
-							Body  string `json:"body"`
-					} `json:"notification"`
-					Android struct {
-							Notification struct {
-									Title string `json:"title"`
-									Body  string `json:"body"`
-									Sound string `json:"sound"` // Android-specific sound placement
-							} `json:"notification"`
-					} `json:"android,omitempty"`
-					Data interface{} `json:"data,omitempty"`
-			} `json:"message"`
+		Message struct {
+			Token        string `json:"token"`
+			Notification struct {
+				Title            string `json:"title,omitempty"`
+				Body             string `json:"body,omitempty"`
+				Icon             string `json:"icon,omitempty"`
+				Sound            string `json:"sound,omitempty"`
+				Badge            string `json:"badge,omitempty"`
+				Tag              string `json:"tag,omitempty"`
+				Color            string `json:"color,omitempty"`
+				ClickAction      string `json:"click_action,omitempty"`
+				BodyLocKey       string `json:"body_loc_key,omitempty"`
+				BodyLocArgs      string `json:"body_loc_args,omitempty"`
+				TitleLocKey      string `json:"title_loc_key,omitempty"`
+				TitleLocArgs     string `json:"title_loc_args,omitempty"`
+				AndroidChannelID string `json:"android_channel_id,omitempty"`
+				// Image            string `json:"image,omitempty"`
+			} `json:"notification"`
+			Android struct {
+				Notification struct {
+					Title            string `json:"title,omitempty"`
+					Body             string `json:"body,omitempty"`
+					Icon             string `json:"icon,omitempty"`
+					Sound            string `json:"sound,omitempty"`
+					Badge            string `json:"badge,omitempty"`
+					Tag              string `json:"tag,omitempty"`
+					Color            string `json:"color,omitempty"`
+					ClickAction      string `json:"click_action,omitempty"`
+					BodyLocKey       string `json:"body_loc_key,omitempty"`
+					BodyLocArgs      string `json:"body_loc_args,omitempty"`
+					TitleLocKey      string `json:"title_loc_key,omitempty"`
+					TitleLocArgs     string `json:"title_loc_args,omitempty"`
+					AndroidChannelID string `json:"android_channel_id,omitempty"`
+					// Image            string `json:"image,omitempty"`
+				} `json:"notification"`
+			} `json:"android,omitempty"`
+			Data interface{} `json:"data,omitempty"`
+		} `json:"message"`
 	}{}
 
 	// Assign recipient's token, and transform NotificationPayload to platform-specific structures
 	payload.Message.Token = f.Message.To // Assuming 'To' field is used for the recipient's token
 	payload.Message.Notification.Title = f.Message.Notification.Title
 	payload.Message.Notification.Body = f.Message.Notification.Body
+	payload.Message.Notification.Icon = f.Message.Notification.Icon
+	payload.Message.Notification.Sound = f.Message.Notification.Sound
+	payload.Message.Notification.Badge = f.Message.Notification.Badge
+	payload.Message.Notification.Tag = f.Message.Notification.Tag
+	payload.Message.Notification.Color = f.Message.Notification.Color
+	payload.Message.Notification.ClickAction = f.Message.Notification.ClickAction
+	payload.Message.Notification.BodyLocKey = f.Message.Notification.BodyLocKey
+	payload.Message.Notification.BodyLocArgs = f.Message.Notification.BodyLocArgs
+	payload.Message.Notification.TitleLocKey = f.Message.Notification.TitleLocKey
+	payload.Message.Notification.TitleLocArgs = f.Message.Notification.TitleLocArgs
+	payload.Message.Notification.AndroidChannelID = f.Message.Notification.AndroidChannelID
+	// payload.Message.Notification.Image = f.Message.Notification.Image
 
 	// For Android
 	payload.Message.Android.Notification.Title = f.Message.Notification.Title
 	payload.Message.Android.Notification.Body = f.Message.Notification.Body
+	payload.Message.Android.Notification.Icon = f.Message.Notification.Icon
 	payload.Message.Android.Notification.Sound = f.Message.Notification.Sound
+	payload.Message.Android.Notification.Badge = f.Message.Notification.Badge
+	payload.Message.Android.Notification.Tag = f.Message.Notification.Tag
+	payload.Message.Android.Notification.Color = f.Message.Notification.Color
+	payload.Message.Android.Notification.ClickAction = f.Message.Notification.ClickAction
+	payload.Message.Android.Notification.BodyLocKey = f.Message.Notification.BodyLocKey
+	payload.Message.Android.Notification.BodyLocArgs = f.Message.Notification.BodyLocArgs
+	payload.Message.Android.Notification.TitleLocKey = f.Message.Notification.TitleLocKey
+	payload.Message.Android.Notification.TitleLocArgs = f.Message.Notification.TitleLocArgs
+	payload.Message.Android.Notification.AndroidChannelID = f.Message.Notification.AndroidChannelID
+	// payload.Message.Android.Notification.Image = f.Message.Notification.Image
 
 	// Assign any additional data
 	payload.Message.Data = f.Message.Data
 
 	jsonByte, err := json.Marshal(payload)
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	projectID, err := f.getProjectID()
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	request, err := http.NewRequest("POST", fmt.Sprintf("https://fcm.googleapis.com/v1/projects/%s/messages:send", projectID), bytes.NewBuffer(jsonByte))
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	request.Header.Set("Authorization", "Bearer "+token)
@@ -297,25 +346,22 @@ func (f *FcmClient) sendViaV1() (*FcmResponseStatus, error) {
 	client := &http.Client{}
 	response, err := client.Do(request)
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	fcmRespStatus := new(FcmResponseStatus)
 	if err := json.Unmarshal(body, fcmRespStatus); err != nil {
-			return nil, err
+		return nil, err
 	}
 
 	return fcmRespStatus, nil
 }
-
-
-
 
 // Old Send to fcm
 // func (this *FcmClient) Send() (*FcmResponseStatus, error) {
