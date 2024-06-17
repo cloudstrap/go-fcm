@@ -426,6 +426,11 @@ func (this *FcmClient) convertToV1Message() map[string]interface{} {
 	title := safeString(notification.Title)
 	body := safeString(notification.Body)
 
+	// Check if "alert" is present in data and is a string
+	if alert, exists := data["alert"].(string); exists && alert != "" {
+		title = alert
+	}
+
 	// if notification_count is provided, set it to what is provided, else set it to 0
 
 	notification_count := 0
