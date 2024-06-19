@@ -418,6 +418,15 @@ func (this *FcmClient) convertToV1Message() map[string]interface{} {
 
 	flattenMap("", data, v1Data)
 
+	// Stringify the original data map
+	stringifiedData, err := json.Marshal(data)
+	if err != nil {
+		stringifiedData = []byte("{}") // Fallback to empty JSON object if marshalling fails
+	}
+
+	// Inject the stringified original data into v1Data
+	v1Data["data"] = string(stringifiedData)
+
 	notification := this.Message.Notification
 
 	// fmt.Println("Debug - notification:", notification)
