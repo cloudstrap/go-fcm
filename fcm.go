@@ -405,17 +405,106 @@ func flattenMap(prefix string, input map[string]interface{}, output map[string]s
 	}
 }
 
+// func (this *FcmClient) convertToV1Message() map[string]interface{} {
+// 	// Ensure data is of type map[string]interface{}
+// 	data, ok := this.Message.Data.(map[string]interface{})
+// 	if !ok {
+// 		// fmt.Println("Debug - data is not a map[string]interface{}")
+// 		data = make(map[string]interface{})
+// 	}
+
+// 	// Filter and process data to ensure compatibility with FCM
+// 	v1Data := make(map[string]string)
+
+// 	flattenMap("", data, v1Data)
+
+// 	// Stringify the original data map
+// 	stringifiedData, err := json.Marshal(data)
+// 	if err != nil {
+// 		stringifiedData = []byte("{}") // Fallback to empty JSON object if marshalling fails
+// 	}
+
+// 	// Inject the stringified original data into v1Data
+// 	v1Data["data"] = string(stringifiedData)
+
+// 	notification := this.Message.Notification
+
+// 	// fmt.Println("Debug - notification:", notification)
+
+// 	// Use alert if title is not provided
+// 	title := safeString(notification.Title)
+// 	body := safeString(notification.Body)
+
+// 	// Check if "alert" is present in data and is a string
+// 	if alert, exists := data["alert"].(string); exists && alert != "" {
+// 		title = alert
+// 	}
+
+// 	// if notification_count is provided, set it to what is provided, else set it to 0
+
+// 	notification_count := 0
+// 	var notification_err error
+// 	notification_badge := safeString(notification.Badge)
+// 	if notification_badge != "" {
+// 		notification_count, notification_err = strconv.Atoi(notification_badge)
+// 		if notification_err != nil {
+// 			notification_count = 0
+// 		}
+// 	}
+
+// 	// Debug prints
+// 	// fmt.Println("Debug - data:", data)
+// 	// fmt.Println("Debug - filteredData:", filteredData)
+// 	// fmt.Println("Debug - notification:", notification)
+
+// 	v1Message := map[string]interface{}{
+// 		"message": map[string]interface{}{
+// 			"token": this.Message.To,
+// 			"notification": map[string]interface{}{
+// 				"title": title,
+// 				"body":  body,
+// 			},
+// 			"data": v1Data,
+// 			"android": map[string]interface{}{
+// 				"collapse_key":            safeString(this.Message.CollapseKey),
+// 				"priority":                safeString(this.Message.Priority),
+// 				"ttl":                     fmt.Sprintf("%ds", this.Message.TimeToLive),
+// 				"restricted_package_name": safeString(this.Message.RestrictedPackageName),
+// 				"data":                    v1Data,
+// 				"notification": map[string]interface{}{
+// 					"title":              title,
+// 					"body":               body,
+// 					"icon":               safeString(notification.Icon),
+// 					"color":              safeString(notification.Color),
+// 					"sound":              safeString(notification.Sound),
+// 					"notification_count": notification_count,
+// 					"tag":                safeString(notification.Tag),
+// 					"click_action":       safeString(notification.ClickAction),
+// 					"body_loc_key":       safeString(notification.BodyLocKey),
+// 					"body_loc_args":      safeString(notification.BodyLocArgs),
+// 					"title_loc_key":      safeString(notification.TitleLocKey),
+// 					"title_loc_args":     safeString(notification.TitleLocArgs),
+// 					"channel_id":         safeString(notification.AndroidChannelID),
+// 					// "notification_count": 1,
+// 				},
+// 			},
+// 		},
+// 	}
+
+// 	// fmt.Println("Debug - v1Message:", v1Message)
+
+// 	return v1Message
+// }
+
 func (this *FcmClient) convertToV1Message() map[string]interface{} {
 	// Ensure data is of type map[string]interface{}
 	data, ok := this.Message.Data.(map[string]interface{})
 	if !ok {
-		// fmt.Println("Debug - data is not a map[string]interface{}")
 		data = make(map[string]interface{})
 	}
 
 	// Filter and process data to ensure compatibility with FCM
 	v1Data := make(map[string]string)
-
 	flattenMap("", data, v1Data)
 
 	// Stringify the original data map
@@ -429,69 +518,72 @@ func (this *FcmClient) convertToV1Message() map[string]interface{} {
 
 	notification := this.Message.Notification
 
-	// fmt.Println("Debug - notification:", notification)
+	// Check if notification fields are empty
+	hasNotification := notification.Title != "" || notification.Body != "" || notification.Icon != "" ||
+		notification.Color != "" || notification.Sound != "" || notification.Badge != "" ||
+		notification.Tag != "" || notification.ClickAction != "" || notification.BodyLocKey != "" ||
+		notification.BodyLocArgs != "" || notification.TitleLocKey != "" || notification.TitleLocArgs != "" ||
+		notification.AndroidChannelID != ""
 
-	// Use alert if title is not provided
-	title := safeString(notification.Title)
-	body := safeString(notification.Body)
-
-	// Check if "alert" is present in data and is a string
-	if alert, exists := data["alert"].(string); exists && alert != "" {
-		title = alert
-	}
-
-	// if notification_count is provided, set it to what is provided, else set it to 0
-
-	notification_count := 0
-	var notification_err error
-	notification_badge := safeString(notification.Badge)
-	if notification_badge != "" {
-		notification_count, notification_err = strconv.Atoi(notification_badge)
-		if notification_err != nil {
-			notification_count = 0
-		}
-	}
-
-	// Debug prints
-	// fmt.Println("Debug - data:", data)
-	// fmt.Println("Debug - filteredData:", filteredData)
-	// fmt.Println("Debug - notification:", notification)
-
+	// Construct base message
 	v1Message := map[string]interface{}{
 		"message": map[string]interface{}{
 			"token": this.Message.To,
-			"notification": map[string]interface{}{
-				"title": title,
-				"body":  body,
-			},
-			"data": v1Data,
-			"android": map[string]interface{}{
-				"collapse_key":            safeString(this.Message.CollapseKey),
-				"priority":                safeString(this.Message.Priority),
-				"ttl":                     fmt.Sprintf("%ds", this.Message.TimeToLive),
-				"restricted_package_name": safeString(this.Message.RestrictedPackageName),
-				"data":                    v1Data,
-				"notification": map[string]interface{}{
-					"title":              title,
-					"body":               body,
-					"icon":               safeString(notification.Icon),
-					"color":              safeString(notification.Color),
-					"sound":              safeString(notification.Sound),
-					"notification_count": notification_count,
-					"tag":                safeString(notification.Tag),
-					"click_action":       safeString(notification.ClickAction),
-					"body_loc_key":       safeString(notification.BodyLocKey),
-					"body_loc_args":      safeString(notification.BodyLocArgs),
-					"title_loc_key":      safeString(notification.TitleLocKey),
-					"title_loc_args":     safeString(notification.TitleLocArgs),
-					"channel_id":         safeString(notification.AndroidChannelID),
-					// "notification_count": 1,
-				},
-			},
+			"data":  v1Data,
 		},
 	}
 
-	// fmt.Println("Debug - v1Message:", v1Message)
+	// If notification fields are present, add notification keys
+	if hasNotification {
+		title := safeString(notification.Title)
+		body := safeString(notification.Body)
+
+		// Check if "alert" is present in data and is a string
+		if alert, exists := data["alert"].(string); exists && alert != "" {
+			title = alert
+		}
+
+		// if notification_count is provided, set it to what is provided, else set it to 0
+		notification_count := 0
+		var notification_err error
+		notification_badge := safeString(notification.Badge)
+		if notification_badge != "" {
+			notification_count, notification_err = strconv.Atoi(notification_badge)
+			if notification_err != nil {
+				notification_count = 0
+			}
+		}
+
+		// Add notification to the message
+		v1Message["message"].(map[string]interface{})["notification"] = map[string]interface{}{
+			"title": title,
+			"body":  body,
+		}
+
+		// Add android specific notification fields
+		v1Message["message"].(map[string]interface{})["android"] = map[string]interface{}{
+			"collapse_key":            safeString(this.Message.CollapseKey),
+			"priority":                safeString(this.Message.Priority),
+			"ttl":                     fmt.Sprintf("%ds", this.Message.TimeToLive),
+			"restricted_package_name": safeString(this.Message.RestrictedPackageName),
+			"data":                    v1Data,
+			"notification": map[string]interface{}{
+				"title":              title,
+				"body":               body,
+				"icon":               safeString(notification.Icon),
+				"color":              safeString(notification.Color),
+				"sound":              safeString(notification.Sound),
+				"notification_count": notification_count,
+				"tag":                safeString(notification.Tag),
+				"click_action":       safeString(notification.ClickAction),
+				"body_loc_key":       safeString(notification.BodyLocKey),
+				"body_loc_args":      safeString(notification.BodyLocArgs),
+				"title_loc_key":      safeString(notification.TitleLocKey),
+				"title_loc_args":     safeString(notification.TitleLocArgs),
+				"channel_id":         safeString(notification.AndroidChannelID),
+			},
+		}
+	}
 
 	return v1Message
 }
@@ -516,8 +608,46 @@ func (this *FcmResponseStatus) parseStatusBody(body []byte) error {
 	return nil
 }
 
-func (this *FcmResponseStatus) parseStatusBodyV1(body []byte) error {
+// func (this *FcmResponseStatus) parseStatusBodyV1(body []byte) error {
 
+// 	// Try parsing as FCM v1 API
+// 	var v1Resp FcmV1Response
+// 	if err := json.Unmarshal(body, &v1Resp); err != nil {
+// 		// fmt.Println("Error parsing response body1:", err)
+// 		return err
+// 	}
+
+// 	// Normalize v1 response to legacy format
+// 	this.MulticastId = 0   // No equivalent in v1, setting it to 0
+// 	this.Success = 0       // Default to 0, will be updated based on error presence
+// 	this.Fail = 0          // Default to 0, will be updated based on error presence
+// 	this.Canonical_ids = 0 // No equivalent in v1
+// 	this.Results = nil     // No equivalent in v1
+
+// 	// Check if there was an error
+// 	if v1Resp.Error.Message != "" {
+// 		this.Fail = 1
+// 		this.Results = append(this.Results, map[string]string{
+// 			// "error": fmt.Sprintf("%s - %s", v1Resp.Error.Status, v1Resp.Error.Message),
+// 			"error": v1Resp.Error.Status,
+// 		})
+// 		this.Err = v1Resp.Error.Message
+// 		this.StatusCode = v1Resp.Error.Code
+// 		this.Ok = false
+// 	} else {
+// 		this.Success = 1
+// 		this.Results = append(this.Results, map[string]string{
+// 			"message_id": v1Resp.Name,
+// 		})
+// 		this.MsgId = 1 // Setting a default value for MsgId since it's not available in v1
+// 		this.Ok = true
+// 		this.StatusCode = 200
+// 	}
+
+// 	return nil
+// }
+
+func (this *FcmResponseStatus) parseStatusBodyV1(body []byte) error {
 	// Try parsing as FCM v1 API
 	var v1Resp FcmV1Response
 	if err := json.Unmarshal(body, &v1Resp); err != nil {
@@ -535,9 +665,20 @@ func (this *FcmResponseStatus) parseStatusBodyV1(body []byte) error {
 	// Check if there was an error
 	if v1Resp.Error.Message != "" {
 		this.Fail = 1
+
+		// Extract errorCode from details
+		errorCode := v1Resp.Error.Status
+		if len(v1Resp.Error.Details) > 0 {
+			for _, detail := range v1Resp.Error.Details {
+				if detail.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" {
+					errorCode = detail.ErrorCode
+					break
+				}
+			}
+		}
+
 		this.Results = append(this.Results, map[string]string{
-			// "error": fmt.Sprintf("%s - %s", v1Resp.Error.Status, v1Resp.Error.Message),
-			"error": v1Resp.Error.Status,
+			"error": errorCode,
 		})
 		this.Err = v1Resp.Error.Message
 		this.StatusCode = v1Resp.Error.Code
