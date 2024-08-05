@@ -533,6 +533,11 @@ func (this *FcmClient) convertToV1Message() map[string]interface{} {
 		},
 	}
 
+	// Include priority in the android section
+	v1Message["message"].(map[string]interface{})["android"] = map[string]interface{}{
+		"priority": safeString(this.Message.Priority),
+	}
+
 	// If notification fields are present, add notification keys
 	if hasNotification {
 		title := safeString(notification.Title)
